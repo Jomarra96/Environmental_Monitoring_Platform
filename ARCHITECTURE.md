@@ -46,10 +46,19 @@ Data from the sensor will come in raw format to the uC, where it will be process
 In case WiFi connection is not available for more than a week, old data will remain, and new data will be discarded.
 
 ### Memory budget (64kB)
-Serialized data buffering will take around 20kB of space. The program itself will account for aprox 10-15kB, if using a state machine. That leaves us with half the memory available to account for stack overgrow, recursion, or else. This only accounts for one sensor type, however, so either increasing the number of sensors or the sampling rate would quickly make the serialized buffer grow, having to rethink the memory strategy.
+Serialized data buffering will take around 20kB of space without any compression applied. The program itself will account for aprox 10-15kB, if using a state machine. That leaves us with half the memory available to account for stack overgrowth, recursion, or else. This only accounts for one sensor type, however, so either increasing the number of sensors or the sampling rate would quickly make the serialized buffer grow, having to rethink the data persistence strategy. If more persistence is necessary, either an external memory or serious compression must be studied.
 
 ## Power Management Approach: Sleep/wake cycles, radio duty cycling, low-battery behavior (if applicable).
+Currently, power management strategy consists on using the internal SMPS instead of the LDO regulator, disabling peripherals and network modem and setting the master device to sleep. Given it will wake up every 10min for sampling (<100ms) and every 1h for serialization and transmission (<10s), low power mode will account for >99.5% of device operation. Even more when network problems are detected and exponential backoff is engaged.
+
 ### Power budget
+State_draw(mAh) = Active_time(s) * Repeats_per_cycle * Current_draw(mA) * (1h/3600s)
+Low_power       =   600          *      6            *      0.020       * (1h/3600s) = 0.02     mAh
+Active          =   0.1          *      6            *        3         * (1h/3600s) = 0.0005   mAh
+Serialize_transm=    5           *      1            *       150        * (1h/3600s) = 0.21     mAh
+
+For 1 transmission cycle (1h):0.23mAh -> 1day:5.52mAh -> 1year:2015mAh.
+Given a typical 18650 Li-ion rechargeable battery of 3500mAh and our current assumptions, a conservative power profile would allow for more than 1.5 years of continued operation. The biggest power draw is the modem, so a lenghty/spotty connection could severely affect the device battery life. However, the 6+ month requirement could be achieved with plenty of overhead.
 
 ## Error Handling Strategy: Sensor failure, network drop, TLS handshake failure—how does the system recover?
 
