@@ -2,7 +2,7 @@
 
 ## Hardware
 Must have ADC and I2C ports.
-Memory constrains are mostly irrelevant for this exercise, since we can log the memory usage and ensure it doesn't surpass the established limits. Given my current hardware availability, I will steer towards an STM32 U575, and provide viable solutions about WiFi within it. This will also allow us to plan for low power modes, where the U5 excels.
+Memory constrains are mostly irrelevant for this exercise, since we can log the memory usage and ensure it doesn't surpass the established limits. To enforce it automatically, we can also modify the linker script to only allow RAM and flash access to restricted memory locations. Given my current hardware availability, I will steer towards an STM32 U575, and provide viable solutions about WiFi within it. This will also allow us to plan for low power modes, where the U5 excels.
 
 WiFi will limit our device selection. Going mainstream, we have the ESP32 (ESP8266 is long been not recommended for new designs) and nRF70 series families. 
 For the WiFi and sensor systems, I will mock their implementation. I do not currently have the available hardware at hand not the time to order them.
@@ -71,3 +71,4 @@ Network drop/TLS handshake failure:
 -   Using the modem as a slave AT command module makes TLS transparent, we don't have to interact with it.
 
 ## Memory Management: How do you ensure zero heap usage while handling variable data rates and buffering?
+In our simple example, we'll keep a 10min sampling rate from a Temp & RH sensor. This allows us to keep more than a week's worth of data in a buffer while still having plenty of space for stack growth and other program buffers (UART, I2C, etc.). If we were to integrate variable data rates and multiple sensor selection, we would need to find a balance between data retention strategy and data rate. It's just a trade-off, after all. An external memory like an SD card would easily solve this issue, though.
