@@ -44,6 +44,7 @@ TIME 0: Raw sensor data received by MCU (4 bytes: temp + humidity)
 ## Data Flow Design: How data flows from Sensor → Processing → Transmission. Include buffering, data persistence (if any), and overflow handling.
 Data from the sensor will come in raw format to the uC, where it will be processed immediately. The processed data will be stored in a buffer and serialized once 1h of data is gathered. Once serialized in CBOR encoding, I estimate a week's worth of data will suffice for any WiFi issues the system may encounter (mainly connection not available due to external factors).
 In case WiFi connection is not available for more than a week, old data will remain, and new data will be discarded.
+Diagram at ./docs/Data_Flow.png
 
 ### Memory budget (64kB)
 Serialized data buffering will take around 20kB of space without any compression applied. The program itself will account for aprox 10-15kB, if using a state machine. That leaves us with half the memory available to account for stack overgrowth, recursion, or else. This only accounts for one sensor type, however, so either increasing the number of sensors or the sampling rate would quickly make the serialized buffer grow, having to rethink the data persistence strategy. If more persistence is necessary, either an external memory or serious compression must be studied.
@@ -55,11 +56,18 @@ Currently, power management strategy consists on using the internal SMPS instead
 State_draw(mAh) = Active_time(s) * Repeats_per_cycle * Current_draw(mA) * (1h/3600s)
 Low_power       =   600          *      6            *      0.020       * (1h/3600s) = 0.02     mAh
 Active          =   0.1          *      6            *        3         * (1h/3600s) = 0.0005   mAh
-Serialize_transm=    5           *      1            *       150        * (1h/3600s) = 0.21     mAh
+Serialize_transm=    5           *      1            *       200        * (1h/3600s) = 0.28     mAh
 
-For 1 transmission cycle (1h):0.23mAh -> 1day:5.52mAh -> 1year:2015mAh.
-Given a typical 18650 Li-ion rechargeable battery of 3500mAh and our current assumptions, a conservative power profile would allow for more than 1.5 years of continued operation. The biggest power draw is the modem, so a lenghty/spotty connection could severely affect the device battery life. However, the 6+ month requirement could be achieved with plenty of overhead.
+For 1 transmission cycle (1h):0.28mAh -> 1day:6.7mAh -> 1year:2450mAh.
+Given a typical 18650 Li-ion rechargeable battery of 3500mAh and our current assumptions, a conservative power profile would allow for more than 1year of continued operation. The biggest power draw is the modem, so a lenghty/spotty connection could severely affect the device battery life. However, the 6+ month requirement would be achieved with plenty of overhead.
 
 ## Error Handling Strategy: Sensor failure, network drop, TLS handshake failure—how does the system recover?
+Sensor failures: 
+-   I2C timeout/CRC mismatch: Retry up to 3 times and reset sensor if exceeded.
+-   Range error: Mark sample as invalid, log anomaly and continue operation.
+
+Network drop/TLS handshake failure:
+-   Exponential backoff retries, capped at an upper limit, as per requirements.
+-   Using the modem as a slave AT command module makes TLS transparent, we don't have to interact with it.
 
 ## Memory Management: How do you ensure zero heap usage while handling variable data rates and buffering?
