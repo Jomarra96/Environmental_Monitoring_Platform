@@ -5,7 +5,6 @@
 *.o
 *.ko
 *.obj
-*.elf
 
 # Linker output
 *.ilk
@@ -54,8 +53,10 @@ dkms.conf
 # Debug information files
 *.dwo
 
-
+# VSCode
+.cproject
+.project
+.settings/
 
 # Documentation
-
 *.pdf
