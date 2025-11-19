@@ -136,7 +136,7 @@ OPT_FLAGS = \
     -fdata-sections
 
 # Dependency generation
-DEP_FLAGS = -MMD -MP
+DEP_FLAGS = -MMD -MP -MF $(@:.o=.d)
 
 # Combined compiler flags
 CFLAGS = \
