@@ -168,7 +168,11 @@ LDFLAGS = \
     -Wl,-Map=$(BUILD_DIR)/$(PROJECT).map \
     -Wl,--cref \
     -static \
-    -Wl,--start-group -lc -lm -Wl,--end-group
+    -Wl,--start-group -lc -lm -Wl,--end-group \
+	-Wl,--wrap=malloc \
+    -Wl,--wrap=calloc \
+    -Wl,--wrap=realloc \
+    -Wl,--wrap=free
 
 # Note: 
 # - specs=nosys.specs prevents default heap allocation
