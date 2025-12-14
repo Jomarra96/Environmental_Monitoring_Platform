@@ -71,15 +71,9 @@ Network drop/TLS handshake failure:
 -   Exponential backoff retries, capped at an upper limit, as per requirements.
 -   Using the modem as a slave AT command module makes TLS transparent, we don't have to interact with it.
 
-Data Quality:
+Recovery within 30s:
 
-- Use a Data Quality score (logged in processed data - Health byte)
-
-Data consistency -> Calculate mean and deviation of sample burst
-
-Range -> Adjust depending on location
-
-Temporal consistency -> Analyze the rate of change of T/RH
+- Add IWDG trimmed to 30s to implementation. Even if the main MCU hangs, the WDG will hard-reset it.
 
 ## Memory Management: How do you ensure zero heap usage while handling variable data rates and buffering?
 In our simple example, we'll keep a 10min sampling rate from a Temp & RH sensor. This allows us to keep more than a week's worth of data in a buffer while still having plenty of space for stack growth and other program buffers (UART, I2C, etc.). If we were to integrate variable data rates and multiple sensor selection, we would need to find a balance between data retention strategy and data rate. It's just a trade-off, after all. An external memory like an SD card would easily solve this issue, though.
