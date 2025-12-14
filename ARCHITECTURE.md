@@ -24,20 +24,21 @@ Diagram at ./docs/Task_management.png
 
 ### Timing budget (really conservative, 100ms is a huge stretch)
 TIME 0: Raw sensor data received by MCU (4 bytes: temp + humidity)
-[0-5ms]     Filter & Validate
-            ├─ Moving average update
-            ├─ Range validation
-            └─ Data quality scoring
 
-[5-10ms]    Anomaly Detection  
-            ├─ Threshold checks
-            ├─ Rate-of-change analysis
-            └─ Statistical outlier detection
+[0 - 10ms]     Filter & Validate
 
-[10-20ms]   Prepare for Transmission*
-            ├─ CBOR encoding
-            ├─ Buffer management
-            └─ Add metadata
+- Moving average
+- Range check
+- Rate-of-change check
+- Statistical outliers (mean + deviation)
+- Generate anomaly flags
+- Data quality scoring (How confident are we in the data gathered?)
+
+[10 - 20ms]   Prepare for Transmission*
+
+- CBOR encoding
+- Buffer management
+- Add metadata
 
 *It is more efficient to encode a bunch of data points at once that doing them one by one. Therefore, the preparation for transmission will NOT occur every time we receive data, but when we are ready to send something.
 
@@ -69,6 +70,16 @@ Sensor failures:
 Network drop/TLS handshake failure:
 -   Exponential backoff retries, capped at an upper limit, as per requirements.
 -   Using the modem as a slave AT command module makes TLS transparent, we don't have to interact with it.
+
+Data Quality:
+
+- Use a Data Quality score (logged in processed data - Health byte)
+
+Data consistency -> Calculate mean and deviation of sample burst
+
+Range -> Adjust depending on location
+
+Temporal consistency -> Analyze the rate of change of T/RH
 
 ## Memory Management: How do you ensure zero heap usage while handling variable data rates and buffering?
 In our simple example, we'll keep a 10min sampling rate from a Temp & RH sensor. This allows us to keep more than a week's worth of data in a buffer while still having plenty of space for stack growth and other program buffers (UART, I2C, etc.). If we were to integrate variable data rates and multiple sensor selection, we would need to find a balance between data retention strategy and data rate. It's just a trade-off, after all. An external memory like an SD card would easily solve this issue, though.
