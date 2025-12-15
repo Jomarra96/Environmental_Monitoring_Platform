@@ -40,7 +40,7 @@ MCU_FLAGS = $(CPU) -mthumb $(FPU) $(FLOAT_ABI)
 # ============================================================
 # SOURCE FILES
 # ============================================================
-# Application sources (auto-discover in src subdirectories)
+# Application (auto-discover in src subdirectories)
 C_SOURCES = \
     $(wildcard $(SRC_DIR)/*.c) \
     $(wildcard $(SRC_DIR)/communication/*.c) \
@@ -49,8 +49,7 @@ C_SOURCES = \
     $(wildcard $(SRC_DIR)/sensors/*.c) \
     $(wildcard $(SRC_DIR)/system/*.c)
 
-# HAL Driver sources (add specific drivers as needed)
-# Start with minimal required drivers, add more as needed
+# HAL Drivers (add specific drivers as needed)
 HAL_SOURCES = \
     $(HAL_DIR)/Src/stm32u5xx_hal.c \
     $(HAL_DIR)/Src/stm32u5xx_hal_cortex.c \
@@ -64,38 +63,34 @@ HAL_SOURCES = \
     $(HAL_DIR)/Src/stm32u5xx_hal_flash.c \
     $(HAL_DIR)/Src/stm32u5xx_hal_flash_ex.c
 
-# Nucleo board support (optional - uncomment if using Nucleo board features)
+# Nucleo board support (optional)
 NUCLEO_SOURCES = \
     $(NUCLEO_DIR)/stm32u5xx_nucleo.c
-
-# Combine all vendor sources
-VENDOR_SOURCES = $(HAL_SOURCES)
-VENDOR_SOURCES += $(NUCLEO_SOURCES)
 
 # Assembly startup file
 ASM_SOURCES = $(STARTUP_DIR)/startup_stm32u575zitxq.s
 
 # Combine all sources
-ALL_C_SOURCES = $(C_SOURCES) $(VENDOR_SOURCES)
+ALL_C_SOURCES = $(C_SOURCES) $(NUCLEO_SOURCES) $(HAL_SOURCES)
 
 # ============================================================
 # INCLUDE PATHS
 # ============================================================
-# Application includes
+# Application
 INCLUDES = \
     -I$(INC_DIR)
 
-# CMSIS includes
+# CMSIS
 CMSIS_INCLUDES = \
     -I$(CMSIS_DIR)/Include \
     -I$(CMSIS_DIR)/Device/ST/STM32U5xx/Include
 
-# HAL Driver includes
+# HAL Driver
 HAL_INCLUDES = \
     -I$(HAL_DIR)/Inc \
     -I$(HAL_DIR)/Inc/Legacy
 
-# Nucleo board includes (uncomment if needed)
+# Nucleo board (uncomment if needed)
 NUCLEO_INCLUDES = -I$(NUCLEO_DIR)
 
 # Combine all includes
@@ -110,32 +105,67 @@ DEFINES = \
     -D$(MCU) \
     -DUSE_HAL_DRIVER
 
-# Optional: Add more defines as needed
-# DEFINES += -DUSE_FULL_ASSERT
+# DEFINES += -DUSE_FULL_ASSERT # Debug build, enables HAL assert
 
 # ============================================================
 # COMPILER FLAGS
 # ============================================================
 # Warning flags
+# -Wall              : Common warnings (uninitialized vars, unused, etc.)
+# -Wextra            : Additional warnings beyond Wall
+# -Wshadow           : Warn when local var shadows another var
+# -Wformat=2         : Strict printf/scanf format checking
+# -Wdouble-promotion : Warn when float auto-promotes to double (costly on M33!)
+# -Wconversion       : Implicit type conversions (catches int/uint bugs)
+# -Wundef            : Warn if undefined macro used in #if
+# -Wcast-align       : Pointer cast alignment issues (M0/M33 care about this)
+# -Wstrict-prototypes: Functions must have prototypes
+# -Wmissing-prototypes: Warn if global func has no prior prototype
+# -Wredundant-decls  : Redundant declarations
+# -Wnull-dereference : Potential null pointer dereference (needs -O1+)
+# -Werror=return-type: Error if non-void function missing return
+# -Wstack-usage=256  : Warn if function stack exceeds N bytes
+# -fno-common        : Error on tentative definitions (catches missing extern)
 WARNING_FLAGS = \
     -Wall \
     -Wextra \
     -Wshadow \
     -Wformat=2 \
-    -Wdouble-promotion
+    -Wdouble-promotion \
+    -Wconversion \
+    -Wundef \
+    -Wcast-align \
+    -Wredundant-decls \
+    -Wnull-dereference \
+    -Werror=return-type \
+    -Wstack-usage=256 \
+    -fno-common
+
+# Note: Keep these for your code only, if needed. Library code (HAL, CMSIS) may trigger warnings.
+# -Wstrict-prototypes: Functions must have prototypes
+# -Wmissing-prototypes: Warn if global func has no prior prototype
+
 
 # Security flags
+# -fstack-protector-strong: Stack canaries for buffer overflow protection
+#                           Requires __stack_chk_guard and __stack_chk_fail
+#                           High overhead - consider disabling for release
 SECURITY_FLAGS = \
-    -fstack-protector-strong \
-    -D_FORTIFY_SOURCE=2
+    -fstack-protector-strong
 
 # Optimization and code generation
+# -O0               : No optimization (dev/debugging)
+# -ffunction-sections: Each function in own section (enables dead code removal)
+# -fdata-sections   : Each variable in own section (enables dead data removal)
 OPT_FLAGS = \
     -O0 \
     -ffunction-sections \
     -fdata-sections
 
 # Dependency generation
+# -MMD            : Generate .d file with dependencies (excluding system headers)
+# -MP             : Add phony targets for headers (avoids errors if header deleted)
+# -MF $(@:.o=.d)  : Output to .d file matching .o name
 DEP_FLAGS = -MMD -MP -MF $(@:.o=.d)
 
 # Combined compiler flags
@@ -149,15 +179,27 @@ CFLAGS = \
     $(DEP_FLAGS)
 
 # Assembly flags
+# -g3: Maximum debug info (includes macro definitions)
 ASFLAGS = $(MCU_FLAGS) -g3
 
 # ============================================================
 # LINKER FLAGS
 # ============================================================
-# Linker script (Flash only)
+# Linker script (memory layout, sections)
 LDSCRIPT = STM32U575ZITXQ_FLASH.ld
 
 # Linker flags
+# -T$(LDSCRIPT)             : Use this linker script
+# -specs=nano.specs         : Use newlib-nano (smaller libc, ~10x smaller printf)
+# -specs=nosys.specs        : Stub syscalls (no OS, provides empty _exit, _sbrk, etc.). Prevents heap allocation
+# -Wl,--gc-sections         : Remove unused functions/data (works with -ffunction-sections)
+# -Wl,--print-memory-usage  : Show RAM/Flash usage after linking
+# -Wl,-Map=...              : Generate map file (symbol addresses, sizes)
+# -Wl,--cref                : Cross-reference table in map (who calls what)
+# -static                   : Static linking (standard for bare-metal)
+# -Wl,--start-group ... --end-group : Link libc and libm, resolve circular deps
+# -Wl,--wrap=malloc/calloc/realloc/free : Wrap malloc family for custom allocator
+#                                         or to trap accidental heap usage
 LDFLAGS = \
     $(MCU_FLAGS) \
     -T$(LDSCRIPT) \
@@ -169,14 +211,10 @@ LDFLAGS = \
     -Wl,--cref \
     -static \
     -Wl,--start-group -lc -lm -Wl,--end-group \
-	-Wl,--wrap=malloc \
+    -Wl,--wrap=malloc \
     -Wl,--wrap=calloc \
     -Wl,--wrap=realloc \
     -Wl,--wrap=free
-
-# Note: 
-# - specs=nosys.specs prevents default heap allocation
-# - Your sysmem.c and syscalls.c handle memory management
 
 # ============================================================
 # BUILD PATHS

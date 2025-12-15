@@ -7,7 +7,7 @@ Memory constrains are mostly irrelevant for this exercise, since we can log the 
 WiFi will limit our device selection. Going mainstream, we have the ESP32 (ESP8266 is long been not recommended for new designs) and nRF70 series families. 
 For the WiFi and sensor systems, I will mock their implementation. I do not currently have the available hardware at hand not the time to order them.
 To separate concerns and simplify the software, I will use a dual-mcu approach: a master (STM32U5) that controls the main logic and a slave (ESP32) that will only handle WiFi communication.
-Diagram at ./docs/System_architecture.png
+Diagram at ./docs/System_architecture.drawio.png
 
 ## Task Management Strategy: Choose between RTOS- based or state- machine approach. Explain your reasoning based on real- time requirements and power constraints.
 There are a couple options here. We could integrate everything on-chip, which would require an RTOS (based on the tight WiFi timing requirements, plus most RTOS provide tested WiFi libraries and examples), or we can use a dual mcu approach.
@@ -20,7 +20,7 @@ To summarize, I will opt for a simpler state-machine approach with dual master-s
 - State machine provides cooperative multitasking
 - Event flags (set by interrupts) trigger state transitions
 - Non-blocking operations ensure responsive execution
-Diagram at ./docs/Task_management.png
+Diagram at ./docs/Task_management.drawio.png
 
 ### Timing budget (really conservative, 100ms is a huge stretch)
 TIME 0: Raw sensor data received by MCU (4 bytes: temp + humidity)
@@ -45,6 +45,8 @@ TIME 0: Raw sensor data received by MCU (4 bytes: temp + humidity)
 ## Data Flow Design: How data flows from Sensor → Processing → Transmission. Include buffering, data persistence (if any), and overflow handling.
 Data from the sensor will come in raw format to the uC, where it will be processed immediately. The processed data will be stored in a buffer and serialized once 1h of data is gathered. Once serialized in CBOR encoding, I estimate a week's worth of data will suffice for any WiFi issues the system may encounter (mainly connection not available due to external factors).
 In case WiFi connection is not available for more than a week, old data will remain, and new data will be discarded.
+Regarding buffer overflows, all inputs will be sanitized by secure instructions and range checks (strncpy instead of strcpy, etc.). On top of that, we implement security flags in our makefile:
+-fstack-protector-strong  # Adds stack canaries to detect buffer overflows. High overhead.
 Diagram at ./docs/Data_Flow.png
 
 ### Memory budget (64kB)
