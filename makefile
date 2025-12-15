@@ -7,7 +7,6 @@ MCU = STM32U575xx
 # ============================================================
 # DIRECTORIES
 # ============================================================
-BUILD_DIR = build
 SRC_DIR = src
 INC_DIR = include
 LIB_DIR = lib
@@ -105,8 +104,6 @@ DEFINES = \
     -D$(MCU) \
     -DUSE_HAL_DRIVER
 
-# DEFINES += -DUSE_FULL_ASSERT # Debug build, enables HAL assert
-
 # ============================================================
 # COMPILER FLAGS
 # ============================================================
@@ -138,13 +135,12 @@ WARNING_FLAGS = \
     -Wredundant-decls \
     -Wnull-dereference \
     -Werror=return-type \
-    -Wstack-usage=256 \
+    -Wstack-usage=512 \
     -fno-common
 
 # Note: Keep these for your code only, if needed. Library code (HAL, CMSIS) may trigger warnings.
 # -Wstrict-prototypes: Functions must have prototypes
 # -Wmissing-prototypes: Warn if global func has no prior prototype
-
 
 # Security flags
 # -fstack-protector-strong: Stack canaries for buffer overflow protection
@@ -153,10 +149,7 @@ WARNING_FLAGS = \
 SECURITY_FLAGS = \
     -fstack-protector-strong
 
-# Optimization and code generation
-# -O0               : No optimization (dev/debugging)
-# -ffunction-sections: Each function in own section (enables dead code removal)
-# -fdata-sections   : Each variable in own section (enables dead data removal)
+
 OPT_FLAGS = \
     -O0 \
     -ffunction-sections \
@@ -168,6 +161,37 @@ OPT_FLAGS = \
 # -MF $(@:.o=.d)  : Output to .d file matching .o name
 DEP_FLAGS = -MMD -MP -MF $(@:.o=.d)
 
+# ============================================================
+# BUILD VARIANT (dev, debug, release)
+# ============================================================
+BUILD ?= dev
+
+# Optimization and code generation
+# -O0/Os               : No optimization (dev/debugging) / size optimization (release)
+# -ffunction-sections: Each function in own section (enables dead code removal)
+# -fdata-sections   : Each variable in own section (enables dead data removal)
+OPT_FLAGS_COMMON = -ffunction-sections -fdata-sections
+
+ifeq ($(BUILD),dev)
+    OPT_FLAGS = -O0 -g $(OPT_FLAGS_COMMON)
+    DEFINES += -DDEV -DUSE_FULL_ASSERT
+    $(info *** Dev build ***)
+
+else ifeq ($(BUILD),debug)
+    OPT_FLAGS = -O0 -g3 $(OPT_FLAGS_COMMON)
+    DEFINES += -DDEBUG -DUSE_FULL_ASSERT
+    $(info *** Debug build ***)
+
+else ifeq ($(BUILD),release)
+    OPT_FLAGS = -Os $(OPT_FLAGS_COMMON)
+    DEFINES += -DNDEBUG
+    SECURITY_FLAGS =	# Purposefully empty for release builds
+    $(info *** Release build ***)
+
+else
+    $(error Unknown BUILD variant: $(BUILD). Use dev, debug, or release)
+endif
+
 # Combined compiler flags
 CFLAGS = \
     $(MCU_FLAGS) \
@@ -178,7 +202,12 @@ CFLAGS = \
     $(SECURITY_FLAGS) \
     $(DEP_FLAGS)
 
-# Assembly flags
+# Build directory
+BUILD_DIR = build/$(BUILD)
+
+# ============================================================
+# ASSEMBLY FLAGS
+# ============================================================
 # -g3: Maximum debug info (includes macro definitions)
 ASFLAGS = $(MCU_FLAGS) -g3
 
@@ -249,7 +278,7 @@ VPATH += $(NUCLEO_DIR)
 # ============================================================
 # PHONY TARGETS
 # ============================================================
-.PHONY: all clean flash size disasm info help libs
+.PHONY: all clean clean-variant flash flash-openocd size disasm info help libs
 
 # ============================================================
 # DEFAULT TARGET
@@ -263,17 +292,27 @@ $(BUILD_DIR):
 	@mkdir -p $@
 
 # ============================================================
+# VERBOSE BUILD OPTION
+# ============================================================
+VERBOSE ?= 0
+ifeq ($(VERBOSE),1)
+    Q =
+else
+    Q = @	# Suppress command output
+endif
+
+# ============================================================
 # COMPILATION RULES
 # ============================================================
 # Compile C sources
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	@echo "Compiling $(notdir $<)"
-	@$(CC) -c $(CFLAGS) $< -o $@
+	$(Q)$(CC) -c $(CFLAGS) $< -o $@
 
 # Assemble startup file
 $(BUILD_DIR)/%.o: %.s | $(BUILD_DIR)
 	@echo "Assembling $(notdir $<)"
-	@$(AS) -c $(ASFLAGS) $< -o $@
+	$(Q)$(AS) -c $(ASFLAGS) $< -o $@
 
 # ============================================================
 # LINKING
@@ -281,7 +320,7 @@ $(BUILD_DIR)/%.o: %.s | $(BUILD_DIR)
 $(TARGET).elf: $(OBJECTS)
 	@echo ""
 	@echo "===== Linking $(PROJECT) ====="
-	@$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+	$(Q)$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 	@echo ""
 
 # ============================================================
@@ -289,11 +328,11 @@ $(TARGET).elf: $(OBJECTS)
 # ============================================================
 $(TARGET).bin: $(TARGET).elf
 	@echo "Creating binary $(notdir $@)"
-	@$(OBJCOPY) -O binary $< $@
+	$(Q)$(OBJCOPY) -O binary $< $@
 
 $(TARGET).hex: $(TARGET).elf
 	@echo "Creating hex $(notdir $@)"
-	@$(OBJCOPY) -O ihex $< $@
+	$(Q)$(OBJCOPY) -O ihex $< $@
 
 # ============================================================
 # UTILITY TARGETS
@@ -302,18 +341,23 @@ $(TARGET).hex: $(TARGET).elf
 size: $(TARGET).elf
 	@echo ""
 	@echo "===== Memory Usage ====="
-	@$(SIZE) $<
+	$(Q)$(SIZE) $<
 	@echo ""
 
 # Generate disassembly
 disasm: $(TARGET).elf
 	@echo "Generating disassembly..."
-	@$(OBJDUMP) -D $< > $(BUILD_DIR)/$(PROJECT).dis
+	$(Q)$(OBJDUMP) -D $< > $(BUILD_DIR)/$(PROJECT).dis
 	@echo "Disassembly saved to $(BUILD_DIR)/$(PROJECT).dis"
 
-# Clean build artifacts
+# Clean all build variants
 clean:
-	@echo "Cleaning build artifacts..."
+	@echo "Cleaning all builds..."
+	@rm -rf build
+
+# Clean current variant only
+clean-variant:
+	@echo "Cleaning $(BUILD) build..."
 	@rm -rf $(BUILD_DIR)
 
 # Flash to device (using st-flash)
@@ -340,7 +384,13 @@ info:
 	@echo "Project:      $(PROJECT)"
 	@echo "MCU:          $(MCU)"
 	@echo "Linker:       $(LDSCRIPT)"
+	@echo ""
+	@echo "===== Build Configuration ====="
+	@echo "Variant:      $(BUILD)"
 	@echo "Build Dir:    $(BUILD_DIR)"
+	@echo "Optimization: $(OPT_FLAGS)"
+	@echo "Defines:      $(DEFINES)"
+	@echo "Security:     $(SECURITY_FLAGS)"
 	@echo ""
 	@echo "===== Source Statistics ====="
 	@echo "Application:  $(words $(C_SOURCES)) C files"
@@ -348,54 +398,38 @@ info:
 	@echo "Assembly:     $(words $(ASM_SOURCES)) files"
 	@echo "Total:        $(words $(OBJECTS)) object files"
 	@echo ""
-	@echo "===== Compiler Flags ====="
-	@echo "MCU:          $(MCU_FLAGS)"
-	@echo "Optimization: $(OPT_FLAGS)"
-	@echo "Security:     $(SECURITY_FLAGS)"
-	@echo "Warnings:     $(WARNING_FLAGS)"
-	@echo ""
 
 # Help
 help:
 	@echo "===== Makefile Targets ====="
-	@echo "  make              - Build all (default)"
-	@echo "  make clean        - Remove build artifacts"
-	@echo "  make flash        - Flash firmware using st-flash"
-	@echo "  make flash-openocd- Flash firmware using OpenOCD"
+	@echo "  make              - Build all (default: dev)"
+	@echo "  make clean        - Remove all build variants"
+	@echo "  make clean-variant- Remove current variant only"
+	@echo "  make flash        - Build and flash firmware (st-flash)"
+	@echo "  make flash-openocd- Build and flash firmware (OpenOCD)"
 	@echo "  make size         - Show memory usage"
 	@echo "  make disasm       - Generate disassembly listing"
-	@echo "  make info         - Show project information"
+	@echo "  make info         - Show project/build information"
 	@echo "  make libs         - List available HAL drivers"
 	@echo "  make help         - Show this help"
 	@echo ""
-	@echo "===== Build Options ====="
-	@echo "  DEBUG=1           - Build with debug symbols (no optimization)"
+	@echo "===== Build Variants (BUILD=) ====="
+	@echo "  dev (default)     -O0 -g, stack protector, DEV + USE_FULL_ASSERT defined"
+	@echo "  debug             -O0 -g3, stack protector, DEBUG + USE_FULL_ASSERT defined"
+	@echo "  release           -Os, no debug, no stack protector, NDEBUG defined"
+	@echo ""
+	@echo "===== Options ====="
 	@echo "  VERBOSE=1         - Show full compiler commands"
 	@echo ""
 	@echo "===== Examples ====="
-	@echo "  make clean all    - Clean and rebuild"
-	@echo "  make DEBUG=1      - Debug build"
-	@echo "  make VERBOSE=1    - Verbose build"
+	@echo "  make                          - Dev build"
+	@echo "  make BUILD=debug              - Debug build"
+	@echo "  make BUILD=release            - Release build"
+	@echo "  make BUILD=release flash      - Build and flash release"
+	@echo "  make clean-variant BUILD=dev  - Clean only dev build"
+	@echo "  make VERBOSE=1                - Build with full command output"
+	@echo "  make info BUILD=release       - Show release build config"
 	@echo ""
-
-# ============================================================
-# DEBUG BUILD OPTION
-# ============================================================
-DEBUG ?= 0
-ifeq ($(DEBUG),1)
-    OPT_FLAGS = -O0 -g3
-    DEFINES += -DDEBUG
-    SECURITY_FLAGS =
-    $(info *** Debug build enabled ***)
-endif
-
-# ============================================================
-# VERBOSE BUILD OPTION
-# ============================================================
-VERBOSE ?= 0
-ifneq ($(VERBOSE),1)
-    .SILENT:
-endif
 
 # ============================================================
 # INCLUDE DEPENDENCY FILES
