@@ -149,12 +149,6 @@ WARNING_FLAGS = \
 SECURITY_FLAGS = \
     -fstack-protector-strong
 
-
-OPT_FLAGS = \
-    -O0 \
-    -ffunction-sections \
-    -fdata-sections
-
 # Dependency generation
 # -MMD            : Generate .d file with dependencies (excluding system headers)
 # -MP             : Add phony targets for headers (avoids errors if header deleted)
@@ -173,12 +167,12 @@ BUILD ?= dev
 OPT_FLAGS_COMMON = -ffunction-sections -fdata-sections
 
 ifeq ($(BUILD),dev)
-    OPT_FLAGS = -O0 -g $(OPT_FLAGS_COMMON)
+    OPT_FLAGS = -Os -g $(OPT_FLAGS_COMMON)
     DEFINES += -DDEV -DUSE_FULL_ASSERT
     $(info *** Dev build ***)
 
 else ifeq ($(BUILD),debug)
-    OPT_FLAGS = -O0 -g3 $(OPT_FLAGS_COMMON)
+    OPT_FLAGS = -Og -g3 $(OPT_FLAGS_COMMON)
     DEFINES += -DDEBUG -DUSE_FULL_ASSERT
     $(info *** Debug build ***)
 
