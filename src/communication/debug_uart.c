@@ -59,9 +59,26 @@ int int_to_string(int32_t value, char *buf, uint8_t buf_size)
  */
 int uint_to_string(uint32_t value, char *buf, uint8_t buf_size)
 {
-    /* TODO: implement */
-    (void)value;
-    (void)buf;
-    (void)buf_size;
-    return -1;
+    char tmp[11]; /* 4294967295 = 10 chars + null */
+    uint8_t i = 0;
+
+    if (buf_size == 0) return -1;
+
+    /* Build string in reverse */
+    do {
+        tmp[i++] = (char)('0' + (value % 10));
+        value /= 10;
+    } while (value > 0);
+
+    /* Check buffer size */
+    if (i >= buf_size) return -1;
+
+    /* Reverse copy to output */
+    uint8_t len = i;
+    while (i > 0) {
+        *buf++ = tmp[--i];
+    }
+    *buf = '\0';
+
+    return (int)len;
 }
