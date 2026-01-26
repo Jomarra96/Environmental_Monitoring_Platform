@@ -275,7 +275,7 @@ VPATH += $(NUCLEO_DIR)
 # ============================================================
 # PHONY TARGETS
 # ============================================================
-.PHONY: all clean clean-variant flash flash-openocd monitor monitor-stop size disasm info help libs
+.PHONY: all clean clean-variant flash flash-openocd monitor monitor-stop size disasm info help libs test test-clean
 
 # ============================================================
 # DEFAULT TARGET
@@ -389,7 +389,7 @@ flash-openocd: $(TARGET).elf
 #
 SERIAL_PORT ?= /dev/ttyACM0
 SERIAL_BAUD ?= 115200
-SERIAL_LOG  ?= tests/uart_output.log
+SERIAL_LOG  ?= tests/logs/uart_output.log
 SERIAL_PID  ?= .serial_monitor.pid
 
 monitor:
@@ -422,6 +422,28 @@ monitor-stop:
 	else \
 		echo "No monitor PID file found"; \
 	fi
+
+# ============================================================
+# HOST UNIT TESTS
+# ============================================================
+# Run unit tests on host machine (gcc x86_64)
+# These test pure logic functions that don't depend on hardware
+#
+HOST_TEST_DIR = tests/host
+HOST_TEST_BUILD = $(HOST_TEST_DIR)/build
+
+test:
+	@echo "===== Running Host Unit Tests ====="
+	@mkdir -p $(HOST_TEST_BUILD)
+	gcc -DHOST_TEST -I$(SRC_DIR)/communication \
+		$(HOST_TEST_DIR)/unit/test_debug_uart.c \
+		$(SRC_DIR)/communication/debug_uart.c \
+		-o $(HOST_TEST_BUILD)/test_debug_uart
+	@$(HOST_TEST_BUILD)/test_debug_uart
+
+test-clean:
+	@echo "Cleaning host test builds..."
+	@rm -rf $(HOST_TEST_BUILD)
 
 # List available HAL drivers
 libs:
@@ -461,6 +483,8 @@ help:
 	@echo "  make flash-openocd- Build and flash firmware (OpenOCD)"
 	@echo "  make monitor      - Start serial capture (background)"
 	@echo "  make monitor-stop - Stop serial capture"
+	@echo "  make test         - Run host unit tests"
+	@echo "  make test-clean   - Remove host test binaries"
 	@echo "  make size         - Show memory usage"
 	@echo "  make disasm       - Generate disassembly listing"
 	@echo "  make info         - Show project/build information"
