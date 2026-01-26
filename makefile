@@ -60,7 +60,9 @@ HAL_SOURCES = \
     $(HAL_DIR)/Src/stm32u5xx_hal_dma.c \
     $(HAL_DIR)/Src/stm32u5xx_hal_dma_ex.c \
     $(HAL_DIR)/Src/stm32u5xx_hal_flash.c \
-    $(HAL_DIR)/Src/stm32u5xx_hal_flash_ex.c
+    $(HAL_DIR)/Src/stm32u5xx_hal_flash_ex.c \
+    $(HAL_DIR)/Src/stm32u5xx_hal_uart.c \
+    $(HAL_DIR)/Src/stm32u5xx_hal_uart_ex.c
 
 # Nucleo board support (optional)
 NUCLEO_SOURCES = \
