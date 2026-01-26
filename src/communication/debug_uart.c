@@ -17,11 +17,40 @@
  */
 int int_to_string(int32_t value, char *buf, uint8_t buf_size)
 {
-    /* TODO: implement */
-    (void)value;
-    (void)buf;
-    (void)buf_size;
-    return -1;
+    char tmp[12]; /* -2147483648 = 11 chars + null */
+    uint8_t i = 0;
+    uint8_t neg = 0;
+    uint32_t uval;
+
+    if (buf_size == 0) return -1;
+
+    /* Handle negative */
+    if (value < 0) {
+        neg = 1;
+        uval = (uint32_t)(-(value + 1)) + 1; /* avoid overflow on INT32_MIN */
+    } else {
+        uval = (uint32_t)value;
+    }
+
+    /* Build string in reverse */
+    do {
+        tmp[i++] = (char)('0' + (uval % 10));
+        uval /= 10;
+    } while (uval > 0);
+
+    if (neg) tmp[i++] = '-';
+
+    /* Check buffer size (need space for null) */
+    if (i >= buf_size) return -1;
+
+    /* Reverse copy to output */
+    uint8_t len = i;
+    while (i > 0) {
+        *buf++ = tmp[--i];
+    }
+    *buf = '\0';
+
+    return (int)len;
 }
 
 /*
