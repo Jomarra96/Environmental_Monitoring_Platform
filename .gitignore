@@ -62,3 +62,7 @@ dkms.conf
 
 # Documentation
 *.pdf
+
+# Host test builds and logs
+tests/host/build/
+tests/logs/
