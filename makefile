@@ -79,7 +79,8 @@ ALL_C_SOURCES = $(C_SOURCES) $(NUCLEO_SOURCES) $(HAL_SOURCES)
 # ============================================================
 # Application
 INCLUDES = \
-    -I$(INC_DIR)
+    -I$(INC_DIR) \
+    -I$(SRC_DIR)/communication
 
 # CMSIS
 CMSIS_INCLUDES = \
