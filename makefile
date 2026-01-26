@@ -275,7 +275,7 @@ VPATH += $(NUCLEO_DIR)
 # ============================================================
 # PHONY TARGETS
 # ============================================================
-.PHONY: all clean clean-variant flash flash-openocd size disasm info help libs
+.PHONY: all clean clean-variant flash flash-openocd monitor monitor-stop size disasm info help libs
 
 # ============================================================
 # DEFAULT TARGET
@@ -368,6 +368,61 @@ flash-openocd: $(TARGET).elf
 	openocd -f interface/stlink.cfg -f target/stm32u5x.cfg \
 		-c "program $(TARGET).elf verify reset exit"
 
+# ============================================================
+# SERIAL MONITOR (Debug UART capture)
+# ============================================================
+# Hardware: NUCLEO-U575ZI-Q board
+#   - STM32U575ZITXQ (Cortex-M33, 2MB Flash, 784KB RAM)
+#   - ST-Link V3 with Virtual COM Port (VCP)
+#   - USART1: PA9 (TX), PA10 (RX) routed to ST-Link VCP
+#   - Appears as /dev/ttyACM0 on Linux
+#
+# Host: Linux Mint Cinnamon
+#
+# Usage:
+#   make monitor          - Start capture to tests/uart_output.log (background)
+#   make monitor-stop     - Stop capture
+#   tail -f tests/uart_output.log  - Watch output live in another terminal
+#
+# The log file can be read by multiple processes simultaneously.
+# Use PuTTY/minicom INSTEAD of monitor if you need interactive serial.
+#
+SERIAL_PORT ?= /dev/ttyACM0
+SERIAL_BAUD ?= 115200
+SERIAL_LOG  ?= tests/uart_output.log
+SERIAL_PID  ?= .serial_monitor.pid
+
+monitor:
+	@if [ -f $(SERIAL_PID) ] && kill -0 $$(cat $(SERIAL_PID)) 2>/dev/null; then \
+		echo "Monitor already running (PID $$(cat $(SERIAL_PID)))"; \
+		echo "Use 'make monitor-stop' to stop it first"; \
+	else \
+		echo "Starting serial monitor..."; \
+		echo "  Port: $(SERIAL_PORT)"; \
+		echo "  Baud: $(SERIAL_BAUD)"; \
+		echo "  Log:  $(SERIAL_LOG)"; \
+		stty -F $(SERIAL_PORT) $(SERIAL_BAUD) cs8 -cstopb -parenb raw -echo; \
+		cat $(SERIAL_PORT) >> $(SERIAL_LOG) & echo $$! > $(SERIAL_PID); \
+		echo "Monitor started (PID $$(cat $(SERIAL_PID)))"; \
+		echo ""; \
+		echo "Watch output: tail -f $(SERIAL_LOG)"; \
+		echo "Stop:         make monitor-stop"; \
+	fi
+
+monitor-stop:
+	@if [ -f $(SERIAL_PID) ]; then \
+		PID=$$(cat $(SERIAL_PID)); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID; \
+			echo "Monitor stopped (PID $$PID)"; \
+		else \
+			echo "Monitor not running"; \
+		fi; \
+		rm -f $(SERIAL_PID); \
+	else \
+		echo "No monitor PID file found"; \
+	fi
+
 # List available HAL drivers
 libs:
 	@echo "===== Available HAL Drivers ====="
@@ -404,6 +459,8 @@ help:
 	@echo "  make clean-variant- Remove current variant only"
 	@echo "  make flash        - Build and flash firmware (st-flash)"
 	@echo "  make flash-openocd- Build and flash firmware (OpenOCD)"
+	@echo "  make monitor      - Start serial capture (background)"
+	@echo "  make monitor-stop - Stop serial capture"
 	@echo "  make size         - Show memory usage"
 	@echo "  make disasm       - Generate disassembly listing"
 	@echo "  make info         - Show project/build information"
